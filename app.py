@@ -66,7 +66,7 @@ HF_TOKEN = os.getenv('HUGGINGFACE_API_TOKEN', 'hf_WUEhdzizBkpsdqLjjBZOKQLXldHpBD
 # Database initialization
 def init_db():
     """Initialize SQLite database for A/B testing tracking"""
-    conn = sqlite3.connect('ab_testing.db')
+    conn = sqlite3.connect('/data/ab_testing.db')
     cursor = conn.cursor()
 
     # Campaigns table
@@ -218,7 +218,7 @@ def assign_variation(recipient_email, variations):
 
 def calculate_ab_metrics(campaign_id):
     """Calculate A/B testing metrics for a campaign"""
-    conn = sqlite3.connect('ab_testing.db')
+    conn = sqlite3.connect('/data/ab_testing.db')
     cursor = conn.cursor()
 
     # Get all variations for this campaign
@@ -426,7 +426,7 @@ def create_campaign():
 
         # Create campaign in database
         campaign_id = str(uuid.uuid4())
-        conn = sqlite3.connect('ab_testing.db')
+        conn = sqlite3.connect('/data/ab_testing.db')
         cursor = conn.cursor()
 
         cursor.execute('''
@@ -485,7 +485,7 @@ def upload_recipients():
         csv_input = csv.DictReader(stream)
 
         # Get campaign variations
-        conn = sqlite3.connect('ab_testing.db')
+        conn = sqlite3.connect('/data/ab_testing.db')
         cursor = conn.cursor()
 
         cursor.execute('SELECT variation_name FROM email_variations WHERE campaign_id = ?', (campaign_id,))
@@ -544,7 +544,7 @@ def send_campaign():
             return jsonify({'success': False, 'error': f'Gmail authentication failed: {str(e)}'})
 
         # Get campaign and variations
-        conn = sqlite3.connect('ab_testing.db')
+        conn = sqlite3.connect('/data/ab_testing.db')
         cursor = conn.cursor()
 
         # Get email variations
@@ -641,7 +641,7 @@ def campaign_results(campaign_id):
         metrics = calculate_ab_metrics(campaign_id)
 
         # Get campaign details
-        conn = sqlite3.connect('ab_testing.db')
+        conn = sqlite3.connect('/data/ab_testing.db')
         cursor = conn.cursor()
 
         cursor.execute('SELECT name, status, total_recipients FROM campaigns WHERE id = ?', (campaign_id,))
@@ -669,7 +669,7 @@ def campaign_results(campaign_id):
 def list_campaigns():
     """List all campaigns"""
     try:
-        conn = sqlite3.connect('ab_testing.db')
+        conn = sqlite3.connect('/data/ab_testing.db')
         cursor = conn.cursor()
 
         cursor.execute('SELECT id, name, status, total_recipients, created_at FROM campaigns ORDER BY created_at DESC')
@@ -696,7 +696,7 @@ def list_campaigns():
 def tracking_pixel(tracking_id):
     """Track email opens"""
     try:
-        conn = sqlite3.connect('ab_testing.db')
+        conn = sqlite3.connect('/data/ab_testing.db')
         cursor = conn.cursor()
 
         cursor.execute('''
@@ -726,7 +726,7 @@ def track_click(tracking_id):
     try:
         original_url = request.args.get('url', BASE_URL) # Fallback to BASE_URL
 
-        conn = sqlite3.connect('ab_testing.db')
+        conn = sqlite3.connect('/data/ab_testing.db')
         cursor = conn.cursor()
 
         cursor.execute('''
