@@ -40,14 +40,14 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 def get_db_connection():
     if not DATABASE_URL:
-        # Fallback for local development without DATABASE_URL set
-        # You might want to use a local PostgreSQL instance or inform the user
-        print("DATABASE_URL environment variable not set. Assuming local SQLite for testing.")
-        # For local development with SQLite, you'd revert to:
-        # return sqlite3.connect('ab_testing.db')
-        # However, for this example, we'll raise an error if not on Render with DB_URL
+        # For local development, if you want to use a local PostgreSQL without Render's DATABASE_URL:
+        # You would replace this with your local PostgreSQL connection details
+        print("DATABASE_URL environment variable not set. Please set it for production deployment.")
+        # As a fallback for local testing without setting DATABASE_URL, you could provide static credentials
+        # Or, raise an error to force setting the variable.
         raise ValueError("DATABASE_URL environment variable is not set. Cannot connect to PostgreSQL.")
 
+    # Parse the DATABASE_URL provided by Render (e.g., postgresql://user:password@host:port/database)
     result = urlparse(DATABASE_URL)
     username = result.username
     password = result.password
@@ -60,80 +60,102 @@ def get_db_connection():
         port = port,
         database = database,
         user = username,
-        password = password
+        password = password,
+        sslmode='require' # Add this for Render PostgreSQL connections
     )
     return conn
 
 # Database initialization (PostgreSQL specific SQL)
 def init_db():
     """Initialize PostgreSQL database for A/B testing tracking"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    conn = None # Initialize conn to None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-    # Campaigns table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS campaigns (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            company_name TEXT NOT NULL,
-            product_name TEXT NOT NULL,
-            offer_details TEXT NOT NULL,
-            campaign_type TEXT NOT NULL,
-            target_audience TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            status TEXT DEFAULT 'draft',
-            total_recipients INTEGER DEFAULT 0
-        )
-    ''')
+        # Campaigns table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS campaigns (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                company_name TEXT NOT NULL,
+                product_name TEXT NOT NULL,
+                offer_details TEXT NOT NULL,
+                campaign_type TEXT NOT NULL,
+                target_audience TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                status TEXT DEFAULT 'draft',
+                total_recipients INTEGER DEFAULT 0
+            )
+        ''')
 
-    # Email variations table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS email_variations (
-            id TEXT PRIMARY KEY,
-            campaign_id TEXT NOT NULL,
-            variation_name TEXT NOT NULL,
-            subject_line TEXT NOT NULL,
-            email_body TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (campaign_id) REFERENCES campaigns (id) ON DELETE CASCADE
-        )
-    ''')
+        # Email variations table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS email_variations (
+                id TEXT PRIMARY KEY,
+                campaign_id TEXT NOT NULL,
+                variation_name TEXT NOT NULL,
+                subject_line TEXT NOT NULL,
+                email_body TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (campaign_id) REFERENCES campaigns (id) ON DELETE CASCADE
+            )
+        ''')
 
-    # Recipients table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS recipients (
-            id TEXT PRIMARY KEY,
-            campaign_id TEXT NOT NULL,
-            email_address TEXT NOT NULL,
-            first_name TEXT,
-            last_name TEXT,
-            variation_assigned TEXT NOT NULL,
-            sent_at TIMESTAMP,
-            opened_at TIMESTAMP,
-            clicked_at TIMESTAMP,
-            converted_at TIMESTAMP,
-            status TEXT DEFAULT 'pending',
-            tracking_id TEXT UNIQUE,
-            FOREIGN KEY (campaign_id) REFERENCES campaigns (id) ON DELETE CASCADE
-        )
-    ''')
+        # Recipients table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS recipients (
+                id TEXT PRIMARY KEY,
+                campaign_id TEXT NOT NULL,
+                email_address TEXT NOT NULL,
+                first_name TEXT,
+                last_name TEXT,
+                variation_assigned TEXT NOT NULL,
+                sent_at TIMESTAMP,
+                opened_at TIMESTAMP,
+                clicked_at TIMESTAMP,
+                converted_at TIMESTAMP,
+                status TEXT DEFAULT 'pending',
+                tracking_id TEXT UNIQUE,
+                FOREIGN KEY (campaign_id) REFERENCES campaigns (id) ON DELETE CASCADE
+            )
+        ''')
 
-    # A/B test results table (Note: PostgreSQL uses SERIAL for auto-incrementing integers)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS ab_results (
-            id SERIAL PRIMARY KEY,
-            campaign_id TEXT NOT NULL,
-            variation_name TEXT NOT NULL,
-            metric_name TEXT NOT NULL,
-            metric_value REAL NOT NULL,
-            recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (campaign_id) REFERENCES campaigns (id) ON DELETE CASCADE
-        )
-    ''')
+        # A/B test results table (Note: PostgreSQL uses SERIAL for auto-incrementing integers)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS ab_results (
+                id SERIAL PRIMARY KEY,
+                campaign_id TEXT NOT NULL,
+                variation_name TEXT NOT NULL,
+                metric_name TEXT NOT NULL,
+                metric_value REAL NOT NULL,
+                recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (campaign_id) REFERENCES campaigns (id) ON DELETE CASCADE
+            )
+        ''')
 
-    conn.commit()
-    cursor.close()
-    conn.close()
+        conn.commit()
+        cursor.close()
+        print("PostgreSQL database tables checked/created successfully!")
+    except Exception as e:
+        print(f"Error initializing PostgreSQL database: {e}")
+        # Depending on criticality, you might want to exit or raise the exception.
+        # For a web app, a failed DB init usually means the app can't function.
+        raise # Re-raise the exception so Render logs it as a fatal error
+    finally:
+        if conn:
+            conn.close()
+
+
+# --- Call init_db() immediately after app creation ---
+# This ensures tables are created when the app starts, regardless of how it's run (gunicorn or direct python)
+try:
+    init_db()
+except Exception as e:
+    print(f"FATAL ERROR: Failed to initialize database: {e}")
+    # In a real production app, you might want a more graceful shutdown or alert system
+    # For now, we let the exception propagate so Render knows the service failed to start.
+
 
 # Gmail API configuration
 SCOPES = ['https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/gmail.readonly']
@@ -141,10 +163,12 @@ SCOPES = ['https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.
 # Hugging Face API configuration
 LLAMA_MODEL = "meta-llama/Meta-Llama-3-8B-Instruct"
 HF_API_URL = f"https://api-inference.huggingface.co/models/{LLAMA_MODEL}"
-HF_TOKEN = os.getenv('HUGGINGFACE_API_TOKEN', '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')
+# Fetch token from environment, provide a dummy default for local testing if not set
+HF_TOKEN = os.getenv('HUGGINGFACE_API_TOKEN', 'your_huggingface_api_token_here_if_testing_locally_without_env_var')
 
 # Ensure credentials.json and token.json are present from environment variables
 # This block should be placed at the top level of your script, after 'app = Flask(__name__)'
+# These files are transiently created on Render from env vars for the Gmail API to use.
 if os.environ.get('GOOGLE_CREDENTIALS_JSON_B64'):
     try:
         decoded_credentials = base64.b64decode(os.environ['GOOGLE_CREDENTIALS_JSON_B64']).decode('utf-8')
@@ -182,7 +206,7 @@ def authenticate_gmail():
                 flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
                 creds = flow.run_local_server(port=0)
             else:
-                raise Exception("credentials.json file not found. Download it from Google Cloud Console.")
+                raise Exception("credentials.json file not found. Download it from Google Cloud Console or set GOOGLE_CREDENTIALS_JSON_B64.")
 
         # Save credentials for next run
         with open('token.json', 'w') as token:
@@ -216,8 +240,6 @@ def create_email_message(to_email, subject, body, tracking_id):
 
 def add_click_tracking(html_body, tracking_id):
     """Add click tracking to links in email body"""
-    # import re # Already imported at the top
-
     # Find all links and replace with tracking links
     def replace_link(match):
         original_url = match.group(1)
@@ -365,6 +387,7 @@ BODY: [email content]
     result = query_huggingface(payload)
 
     if 'error' in result:
+        print(f"Hugging Face API Error: {result['error']}. Generating fallback variations.")
         return create_fallback_variations(company_name, product_name, offer_details, campaign_type)
 
     return result
@@ -457,10 +480,10 @@ def create_campaign():
         variations = parse_email_variations(result[0]['generated_text'])
 
         # Create campaign in database
-        campaign_id = str(uuid.uuid4())
         conn = get_db_connection()
         cursor = conn.cursor()
 
+        campaign_id = str(uuid.uuid4())
         cursor.execute(sql.SQL('''
             INSERT INTO campaigns (id, name, company_name, product_name, offer_details, campaign_type, target_audience)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -496,6 +519,7 @@ def create_campaign():
         })
 
     except Exception as e:
+        print(f"Error in create_campaign: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/upload-recipients', methods=['POST'])
@@ -559,6 +583,7 @@ def upload_recipients():
         })
 
     except Exception as e:
+        print(f"Error in upload_recipients: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/send-campaign', methods=['POST'])
@@ -664,15 +689,14 @@ def send_campaign():
         })
 
     except Exception as e:
+        print(f"Error in send_campaign: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/campaign-results/<campaign_id>')
 def campaign_results(campaign_id):
     """Get A/B testing results for a campaign"""
+    conn = None # Initialize conn to None
     try:
-        metrics = calculate_ab_metrics(campaign_id)
-
-        # Get campaign details
         conn = get_db_connection()
         cursor = conn.cursor()
 
@@ -680,10 +704,12 @@ def campaign_results(campaign_id):
         campaign = cursor.fetchone()
 
         cursor.close()
-        conn.close()
+        # conn.close() # Close conn in finally block
 
         if not campaign:
             return jsonify({'success': False, 'error': 'Campaign not found'})
+
+        metrics = calculate_ab_metrics(campaign_id) # This function gets its own connection
 
         return jsonify({
             'success': True,
@@ -696,11 +722,16 @@ def campaign_results(campaign_id):
         })
 
     except Exception as e:
+        print(f"Error in campaign_results: {e}")
         return jsonify({'success': False, 'error': str(e)})
+    finally:
+        if conn:
+            conn.close()
 
 @app.route('/campaigns')
 def list_campaigns():
     """List all campaigns"""
+    conn = None # Initialize conn to None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -718,17 +749,23 @@ def list_campaigns():
         ]
 
         cursor.close()
-        conn.close()
+        # conn.close() # Close conn in finally block
 
         return jsonify({'success': True, 'campaigns': campaigns})
 
     except Exception as e:
+        print(f"Error in list_campaigns: {e}")
         return jsonify({'success': False, 'error': str(e)})
+    finally:
+        if conn:
+            conn.close()
+
 
 # Tracking routes
 @app.route('/pixel/<tracking_id>')
 def tracking_pixel(tracking_id):
     """Track email opens"""
+    conn = None # Initialize conn to None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -741,21 +778,25 @@ def tracking_pixel(tracking_id):
 
         conn.commit()
         cursor.close()
-        conn.close()
+        # conn.close() # Close conn in finally block
 
         # Return 1x1 transparent pixel
         pixel = base64.b64decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')
         return Response(pixel, mimetype='image/gif')
 
-    except Exception as e: # Added logging for debugging
+    except Exception as e:
         print(f"Error tracking pixel for {tracking_id}: {e}")
-        # Return pixel even if tracking fails
+        # Return pixel even if tracking fails, to not break email client display
         pixel = base64.b64decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')
         return Response(pixel, mimetype='image/gif')
+    finally:
+        if conn:
+            conn.close()
 
 @app.route('/click/<tracking_id>')
 def track_click(tracking_id):
     """Track email clicks and redirect"""
+    conn = None # Initialize conn to None
     try:
         original_url = request.args.get('url', BASE_URL) # Fallback to BASE_URL
 
@@ -770,13 +811,16 @@ def track_click(tracking_id):
 
         conn.commit()
         cursor.close()
-        conn.close()
+        # conn.close() # Close conn in finally block
 
         return redirect(original_url)
 
-    except Exception as e: # Added logging for debugging
+    except Exception as e:
         print(f"Error tracking click for {tracking_id}: {e}")
         return redirect(BASE_URL) # Redirect to BASE_URL on error
+    finally:
+        if conn:
+            conn.close()
 
 def parse_email_variations(generated_text):
     """Parse generated text into variation objects"""
@@ -787,7 +831,7 @@ def parse_email_variations(generated_text):
 
     for i, part in enumerate(parts[1:], 1):
         if i > 2:
-            break
+            break # Only take first two variations
 
         lines = part.strip().split('\n')
         subject = ""
@@ -800,10 +844,10 @@ def parse_email_variations(generated_text):
                 subject = line[8:].strip()
             elif line.upper().startswith('BODY:'):
                 body_started = True
-            elif body_started and line:
+            elif body_started: # Any non-empty line after BODY: is part of the body
                 body_lines.append(line)
 
-        body = '\n'.join(body_lines) if body_lines else ""
+        body = '\n'.join(body_lines).strip() # .strip() removes leading/trailing whitespace
 
         if subject and body:
             variations.append({
@@ -811,8 +855,9 @@ def parse_email_variations(generated_text):
                 'body': body
             })
 
-    # Fallback if parsing fails
+    # Fallback if parsing fails or less than 2 variations are generated
     if len(variations) < 2:
+        print("Warning: Less than two variations parsed. Using fallback variations.")
         variations = [
             {
                 'subject': 'Exclusive Offer Inside 🎯',
@@ -827,14 +872,8 @@ def parse_email_variations(generated_text):
     return variations
 
 if __name__ == '__main__':
-    # Initialize database
-    try:
-        init_db()
-        print("PostgreSQL database initialized successfully!")
-    except Exception as e:
-        print(f"Error initializing PostgreSQL database: {e}")
-        print("Please ensure DATABASE_URL is correctly set up for local testing or Render deployment.")
-
+    # This block will now only run when you execute 'python final.py' directly.
+    # The init_db() call for Gunicorn is moved above.
     print("🧪 A/B Testing Email Marketing App")
     print("✉️  Gmail API Integration Ready")
     print("📊 Campaign Tracking Enabled")
