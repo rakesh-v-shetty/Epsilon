@@ -36,7 +36,7 @@ print(f"Application will use BASE_URL: {BASE_URL}")
 
 # --- Database Configuration (PostgreSQL) ---
 # Render provides DATABASE_URL for PostgreSQL services
-DATABASE_URL = os.environ.get("postgresql://ab_test_db_5dt1_user:MrRVP4bChVtKNcKBDqdfbZ2jZ4dBx82Y@dpg-d1e7rube5dus73b4fms0-a/ab_test_db_5dt1")
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 def get_db_connection():
     if not DATABASE_URL:
