@@ -2,14 +2,12 @@ from flask import Flask, render_template, request, jsonify, redirect, Response
 import requests
 import json
 import os
-from datetime import datetime, timedelta
-import sqlite3
+from datetime import datetime
 import random
 import hashlib
 import base64
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import smtplib
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -18,55 +16,58 @@ from googleapiclient.errors import HttpError
 import uuid
 import csv
 import io
-import re # Import re for regex operations
+import re
+
+# Import psycopg2 for PostgreSQL
+import psycopg2
+from psycopg2 import sql
+from urllib.parse import urlparse
 
 app = Flask(__name__)
 
-# Add this near the top of final.py, after app = Flask(__name__)
-# Ensure credentials.json and token.json are present from environment variables
-if os.environ.get('GOOGLE_CREDENTIALS_JSON_B64'):
-    try:
-        decoded_credentials = base64.b64decode(os.environ['GOOGLE_CREDENTIALS_JSON_B64']).decode('utf-8')
-        with open('credentials.json', 'w') as f:
-            f.write(decoded_credentials)
-        print("credentials.json created from environment variable.")
-    except Exception as e:
-        print(f"Error decoding GOOGLE_CREDENTIALS_JSON_B64: {e}")
-
-if os.environ.get('GOOGLE_TOKEN_JSON_B64'):
-    try:
-        decoded_token = base64.b64decode(os.environ['GOOGLE_TOKEN_JSON_B64']).decode('utf-8')
-        with open('token.json', 'w') as f:
-            f.write(decoded_token)
-        print("token.json created from environment variable.")
-    except Exception as e:
-        print(f"Error decoding GOOGLE_TOKEN_JSON_B64: {e}")
-
 # --- Configuration for Render Deployment ---
-# Render sets a PORT environment variable. If not found, default to 5000 for local.
 PORT = int(os.environ.get("PORT", 5000))
-# Render also sets a RENDER_EXTERNAL_HOSTNAME.
-# If running on Render, use https scheme and the external hostname.
-# Otherwise, default to http://localhost:5000 for local development.
 if os.environ.get("RENDER_EXTERNAL_HOSTNAME"):
     BASE_URL = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}"
 else:
-    BASE_URL = f"http://localhost:{PORT}" # Use the actual PORT for local testing
+    BASE_URL = f"http://localhost:{PORT}"
 
 print(f"Application will use BASE_URL: {BASE_URL}")
 
-# Gmail API configuration
-SCOPES = ['https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/gmail.readonly']
+# --- Database Configuration (PostgreSQL) ---
+# Render provides DATABASE_URL for PostgreSQL services
+DATABASE_URL = os.environ.get("postgresql://ab_test_db_5dt1_user:MrRVP4bChVtKNcKBDqdfbZ2jZ4dBx82Y@dpg-d1e7rube5dus73b4fms0-a/ab_test_db_5dt1")
 
-# Hugging Face API configuration
-LLAMA_MODEL = "meta-llama/Meta-Llama-3-8B-Instruct"
-HF_API_URL = f"https://api-inference.huggingface.co/models/{LLAMA_MODEL}"
-HF_TOKEN = os.getenv('HUGGINGFACE_API_TOKEN', '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')
+def get_db_connection():
+    if not DATABASE_URL:
+        # Fallback for local development without DATABASE_URL set
+        # You might want to use a local PostgreSQL instance or inform the user
+        print("DATABASE_URL environment variable not set. Assuming local SQLite for testing.")
+        # For local development with SQLite, you'd revert to:
+        # return sqlite3.connect('ab_testing.db')
+        # However, for this example, we'll raise an error if not on Render with DB_URL
+        raise ValueError("DATABASE_URL environment variable is not set. Cannot connect to PostgreSQL.")
 
-# Database initialization
+    result = urlparse(DATABASE_URL)
+    username = result.username
+    password = result.password
+    database = result.path[1:]
+    hostname = result.hostname
+    port = result.port
+
+    conn = psycopg2.connect(
+        host = hostname,
+        port = port,
+        database = database,
+        user = username,
+        password = password
+    )
+    return conn
+
+# Database initialization (PostgreSQL specific SQL)
 def init_db():
-    """Initialize SQLite database for A/B testing tracking"""
-    conn = sqlite3.connect('/data/ab_testing.db')
+    """Initialize PostgreSQL database for A/B testing tracking"""
+    conn = get_db_connection()
     cursor = conn.cursor()
 
     # Campaigns table
@@ -94,7 +95,7 @@ def init_db():
             subject_line TEXT NOT NULL,
             email_body TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (campaign_id) REFERENCES campaigns (id)
+            FOREIGN KEY (campaign_id) REFERENCES campaigns (id) ON DELETE CASCADE
         )
     ''')
 
@@ -113,25 +114,54 @@ def init_db():
             converted_at TIMESTAMP,
             status TEXT DEFAULT 'pending',
             tracking_id TEXT UNIQUE,
-            FOREIGN KEY (campaign_id) REFERENCES campaigns (id)
+            FOREIGN KEY (campaign_id) REFERENCES campaigns (id) ON DELETE CASCADE
         )
     ''')
 
-    # A/B test results table
+    # A/B test results table (Note: PostgreSQL uses SERIAL for auto-incrementing integers)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS ab_results (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             campaign_id TEXT NOT NULL,
             variation_name TEXT NOT NULL,
             metric_name TEXT NOT NULL,
             metric_value REAL NOT NULL,
             recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (campaign_id) REFERENCES campaigns (id)
+            FOREIGN KEY (campaign_id) REFERENCES campaigns (id) ON DELETE CASCADE
         )
     ''')
 
     conn.commit()
+    cursor.close()
     conn.close()
+
+# Gmail API configuration
+SCOPES = ['https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/gmail.readonly']
+
+# Hugging Face API configuration
+LLAMA_MODEL = "meta-llama/Meta-Llama-3-8B-Instruct"
+HF_API_URL = f"https://api-inference.huggingface.co/models/{LLAMA_MODEL}"
+HF_TOKEN = os.getenv('HUGGINGFACE_API_TOKEN', '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')
+
+# Ensure credentials.json and token.json are present from environment variables
+# This block should be placed at the top level of your script, after 'app = Flask(__name__)'
+if os.environ.get('GOOGLE_CREDENTIALS_JSON_B64'):
+    try:
+        decoded_credentials = base64.b64decode(os.environ['GOOGLE_CREDENTIALS_JSON_B64']).decode('utf-8')
+        with open('credentials.json', 'w') as f:
+            f.write(decoded_credentials)
+        print("credentials.json created from environment variable.")
+    except Exception as e:
+        print(f"Error decoding GOOGLE_CREDENTIALS_JSON_B64: {e}")
+
+if os.environ.get('GOOGLE_TOKEN_JSON_B64'):
+    try:
+        decoded_token = base64.b64decode(os.environ['GOOGLE_TOKEN_JSON_B64']).decode('utf-8')
+        with open('token.json', 'w') as f:
+            f.write(decoded_token)
+        print("token.json created from environment variable.")
+    except Exception as e:
+        print(f"Error decoding GOOGLE_TOKEN_JSON_B64: {e}")
 
 # Gmail API functions
 def authenticate_gmail():
@@ -218,29 +248,29 @@ def assign_variation(recipient_email, variations):
 
 def calculate_ab_metrics(campaign_id):
     """Calculate A/B testing metrics for a campaign"""
-    conn = sqlite3.connect('/data/ab_testing.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
 
     # Get all variations for this campaign
-    cursor.execute('''
+    cursor.execute(sql.SQL('''
         SELECT DISTINCT variation_assigned FROM recipients
-        WHERE campaign_id = ?
-    ''', (campaign_id,))
+        WHERE campaign_id = %s
+    '''), [campaign_id])
     variations = [row[0] for row in cursor.fetchall()]
 
     metrics = {}
 
     for variation in variations:
         # Calculate metrics for each variation
-        cursor.execute('''
+        cursor.execute(sql.SQL('''
             SELECT
                 COUNT(*) as total_sent,
                 COUNT(CASE WHEN opened_at IS NOT NULL THEN 1 END) as opened,
                 COUNT(CASE WHEN clicked_at IS NOT NULL THEN 1 END) as clicked,
                 COUNT(CASE WHEN converted_at IS NOT NULL THEN 1 END) as converted
             FROM recipients
-            WHERE campaign_id = ? AND variation_assigned = ? AND status = 'sent'
-        ''', (campaign_id, variation))
+            WHERE campaign_id = %s AND variation_assigned = %s AND status = 'sent'
+        '''), [campaign_id, variation])
 
         result = cursor.fetchone()
         total_sent, opened, clicked, converted = result
@@ -256,6 +286,7 @@ def calculate_ab_metrics(campaign_id):
             'click_through_rate': (clicked / opened * 100) if opened > 0 else 0
         }
 
+    cursor.close()
     conn.close()
     return metrics
 
@@ -393,12 +424,13 @@ P.S. Join hundreds of satisfied customers who've already made the switch. 🌟''
 # API Routes
 @app.route('/')
 def index():
-    return render_template('index.html')
+    """Redirects to the A/B Dashboard"""
+    return redirect('/ab-dashboard')
 
 @app.route('/ab-dashboard')
 def ab_dashboard():
     """A/B testing dashboard"""
-    return render_template('ab_dashboard.html')
+    return render_template('ab_dashboard.html', base_url=BASE_URL)
 
 @app.route('/create-campaign', methods=['POST'])
 def create_campaign():
@@ -426,13 +458,13 @@ def create_campaign():
 
         # Create campaign in database
         campaign_id = str(uuid.uuid4())
-        conn = sqlite3.connect('/data/ab_testing.db')
+        conn = get_db_connection()
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute(sql.SQL('''
             INSERT INTO campaigns (id, name, company_name, product_name, offer_details, campaign_type, target_audience)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        '''), (
             campaign_id,
             f"{data['company_name']} - {data['campaign_type'].title()}",
             data['company_name'],
@@ -445,15 +477,16 @@ def create_campaign():
         # Save variations
         for i, variation in enumerate(variations):
             variation_id = str(uuid.uuid4())
-            cursor.execute('''
+            cursor.execute(sql.SQL('''
                 INSERT INTO email_variations (id, campaign_id, variation_name, subject_line, email_body)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (
+                VALUES (%s, %s, %s, %s, %s)
+            '''), (
                 variation_id, campaign_id, f"Variation_{chr(65+i)}",
                 variation['subject'], variation['body']
             ))
 
         conn.commit()
+        cursor.close()
         conn.close()
 
         return jsonify({
@@ -485,10 +518,10 @@ def upload_recipients():
         csv_input = csv.DictReader(stream)
 
         # Get campaign variations
-        conn = sqlite3.connect('/data/ab_testing.db')
+        conn = get_db_connection()
         cursor = conn.cursor()
 
-        cursor.execute('SELECT variation_name FROM email_variations WHERE campaign_id = ?', (campaign_id,))
+        cursor.execute(sql.SQL('SELECT variation_name FROM email_variations WHERE campaign_id = %s'), [campaign_id])
         variations = [{'variation_name': row[0]} for row in cursor.fetchall()]
 
         recipients_added = 0
@@ -502,10 +535,10 @@ def upload_recipients():
             assigned_variation = assign_variation(email, variations)
             tracking_id = str(uuid.uuid4())
 
-            cursor.execute('''
+            cursor.execute(sql.SQL('''
                 INSERT INTO recipients (id, campaign_id, email_address, first_name, last_name, variation_assigned, tracking_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            '''), (
                 str(uuid.uuid4()), campaign_id, email,
                 row.get('first_name', ''), row.get('last_name', ''),
                 assigned_variation, tracking_id
@@ -513,9 +546,10 @@ def upload_recipients():
             recipients_added += 1
 
         # Update campaign total recipients
-        cursor.execute('UPDATE campaigns SET total_recipients = ? WHERE id = ?', (recipients_added, campaign_id))
+        cursor.execute(sql.SQL('UPDATE campaigns SET total_recipients = %s WHERE id = %s'), (recipients_added, campaign_id))
 
         conn.commit()
+        cursor.close()
         conn.close()
 
         return jsonify({
@@ -544,29 +578,28 @@ def send_campaign():
             return jsonify({'success': False, 'error': f'Gmail authentication failed: {str(e)}'})
 
         # Get campaign and variations
-        conn = sqlite3.connect('/data/ab_testing.db')
+        conn = get_db_connection()
         cursor = conn.cursor()
 
         # Get email variations
-        cursor.execute('''
+        cursor.execute(sql.SQL('''
             SELECT variation_name, subject_line, email_body
             FROM email_variations
-            WHERE campaign_id = ?
-        ''', (campaign_id,))
+            WHERE campaign_id = %s
+        '''), [campaign_id])
         variations = {row[0]: {'subject': row[1], 'body': row[2]} for row in cursor.fetchall()}
 
         # Get recipients
-        cursor.execute('''
+        cursor.execute(sql.SQL('''
             SELECT id, email_address, first_name, variation_assigned, tracking_id
             FROM recipients
-            WHERE campaign_id = ? AND status = 'pending'
-        ''', (campaign_id,))
+            WHERE campaign_id = %s AND status = 'pending'
+        '''), [campaign_id])
         recipients = cursor.fetchall()
 
         sent_count = 0
         errors = []
 
-        # ... inside the send_campaign function ...
         print(f"--- Starting to send campaign {campaign_id} to {len(recipients)} recipients ---")
 
         for recipient_id, email, first_name, variation, tracking_id in recipients:
@@ -592,21 +625,20 @@ def send_campaign():
                 if result['success']:
                     print(f"  > SUCCESS: Email sent. Updating status to 'sent'.")
                     # Update recipient status
-                    cursor.execute('''
+                    cursor.execute(sql.SQL('''
                         UPDATE recipients
-                        SET status = 'sent', sent_at = ?
-                        WHERE id = ?
-                    ''', (datetime.now(), recipient_id))
+                        SET status = 'sent', sent_at = CURRENT_TIMESTAMP
+                        WHERE id = %s
+                    '''), [recipient_id])
                     sent_count += 1
                 else:
-                    # THIS IS THE MOST LIKELY PLACE THE ERROR IS HAPPENING
                     print(f"  > FAILED: Gmail API returned an error: {result['error']}")
                     errors.append(f'{email}: {result["error"]}')
-                    cursor.execute('''
+                    cursor.execute(sql.SQL('''
                         UPDATE recipients
                         SET status = 'failed'
-                        WHERE id = ?
-                    ''', (recipient_id,))
+                        WHERE id = %s
+                    '''), [recipient_id])
 
             except Exception as e:
                 print(f"  > FAILED: An exception occurred: {str(e)}")
@@ -618,10 +650,10 @@ def send_campaign():
         print(f"--- Campaign sending finished. Committing changes to database. ---")
 
         # Update campaign status
-        cursor.execute('UPDATE campaigns SET status = ? WHERE id = ?', ('sent', campaign_id))
+        cursor.execute(sql.SQL('UPDATE campaigns SET status = %s WHERE id = %s'), ('sent', campaign_id))
 
-        # This commit is now redundant if the one above is there, but it doesn't hurt.
         conn.commit()
+        cursor.close()
         conn.close()
 
         return jsonify({
@@ -641,12 +673,13 @@ def campaign_results(campaign_id):
         metrics = calculate_ab_metrics(campaign_id)
 
         # Get campaign details
-        conn = sqlite3.connect('/data/ab_testing.db')
+        conn = get_db_connection()
         cursor = conn.cursor()
 
-        cursor.execute('SELECT name, status, total_recipients FROM campaigns WHERE id = ?', (campaign_id,))
+        cursor.execute(sql.SQL('SELECT name, status, total_recipients FROM campaigns WHERE id = %s'), [campaign_id])
         campaign = cursor.fetchone()
 
+        cursor.close()
         conn.close()
 
         if not campaign:
@@ -669,10 +702,10 @@ def campaign_results(campaign_id):
 def list_campaigns():
     """List all campaigns"""
     try:
-        conn = sqlite3.connect('/data/ab_testing.db')
+        conn = get_db_connection()
         cursor = conn.cursor()
 
-        cursor.execute('SELECT id, name, status, total_recipients, created_at FROM campaigns ORDER BY created_at DESC')
+        cursor.execute(sql.SQL('SELECT id, name, status, total_recipients, created_at FROM campaigns ORDER BY created_at DESC'))
         campaigns = [
             {
                 'id': row[0],
@@ -684,6 +717,7 @@ def list_campaigns():
             for row in cursor.fetchall()
         ]
 
+        cursor.close()
         conn.close()
 
         return jsonify({'success': True, 'campaigns': campaigns})
@@ -696,16 +730,17 @@ def list_campaigns():
 def tracking_pixel(tracking_id):
     """Track email opens"""
     try:
-        conn = sqlite3.connect('/data/ab_testing.db')
+        conn = get_db_connection()
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute(sql.SQL('''
             UPDATE recipients
-            SET opened_at = ?
-            WHERE tracking_id = ? AND opened_at IS NULL
-        ''', (datetime.now(), tracking_id))
+            SET opened_at = CURRENT_TIMESTAMP
+            WHERE tracking_id = %s AND opened_at IS NULL
+        '''), [tracking_id])
 
         conn.commit()
+        cursor.close()
         conn.close()
 
         # Return 1x1 transparent pixel
@@ -721,21 +756,20 @@ def tracking_pixel(tracking_id):
 @app.route('/click/<tracking_id>')
 def track_click(tracking_id):
     """Track email clicks and redirect"""
-    # from flask import redirect # Already imported at the top
-
     try:
         original_url = request.args.get('url', BASE_URL) # Fallback to BASE_URL
 
-        conn = sqlite3.connect('/data/ab_testing.db')
+        conn = get_db_connection()
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute(sql.SQL('''
             UPDATE recipients
-            SET clicked_at = ?
-            WHERE tracking_id = ? AND clicked_at IS NULL
-        ''', (datetime.now(), tracking_id))
+            SET clicked_at = CURRENT_TIMESTAMP
+            WHERE tracking_id = %s AND clicked_at IS NULL
+        '''), [tracking_id])
 
         conn.commit()
+        cursor.close()
         conn.close()
 
         return redirect(original_url)
@@ -794,16 +828,19 @@ def parse_email_variations(generated_text):
 
 if __name__ == '__main__':
     # Initialize database
-    init_db()
+    try:
+        init_db()
+        print("PostgreSQL database initialized successfully!")
+    except Exception as e:
+        print(f"Error initializing PostgreSQL database: {e}")
+        print("Please ensure DATABASE_URL is correctly set up for local testing or Render deployment.")
 
     print("🧪 A/B Testing Email Marketing App")
     print("✉️  Gmail API Integration Ready")
     print("📊 Campaign Tracking Enabled")
     print("🎯 Endpoints:")
-    print(f"   - Main: {BASE_URL}") # Use dynamic BASE_URL
-    print(f"   - Dashboard: {BASE_URL}/ab-dashboard") # Use dynamic BASE_URL
-    print(f"   - Campaigns: {BASE_URL}/campaigns") # Use dynamic BASE_URL
+    print(f"   - Main: {BASE_URL}")
+    print(f"   - Dashboard: {BASE_URL}/ab-dashboard")
+    print(f"   - Campaigns: {BASE_URL}/campaigns")
 
-    # Render automatically binds to 0.0.0.0 and PORT from env.
-    # For local, still use debug=True if desired.
     app.run(debug=True, host='0.0.0.0', port=PORT)
