@@ -204,7 +204,7 @@ def authenticate_gmail():
     creds = None
 
     # Load existing credentials
-    if os.path_exists('token.json'):
+    if os.path.exists('token.json'): # <--- Corrected from os.path_exists
         creds = Credentials.from_authorized_user_file('token.json', SCOPES)
 
     # If no valid credentials, get new ones
@@ -213,7 +213,7 @@ def authenticate_gmail():
             creds.refresh(Request())
         else:
             # You need to download credentials.json from Google Cloud Console
-            if os.path_exists('credentials.json'):
+            if os.path.exists('credentials.json'): # <--- Corrected from os.path_exists
                 flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
                 creds = flow.run_local_server(port=0)
             else:
