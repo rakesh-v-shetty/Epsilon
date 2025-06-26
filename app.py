@@ -112,7 +112,7 @@ def init_db():
                 last_name TEXT,
                 variation_assigned TEXT NOT NULL,
                 sent_at TIMESTAMP,
-                opened_at TIMESTAMP, -- This will store the FIRST open time
+                opened_at TIMESTAMP,
                 clicked_at TIMESTAMP,
                 converted_at TIMESTAMP,
                 status TEXT DEFAULT 'pending',
@@ -120,17 +120,6 @@ def init_db():
                 FOREIGN KEY (campaign_id) REFERENCES campaigns (id) ON DELETE CASCADE
             )
         ''')
-
-        # NEW TABLE: email_open_events to track every open
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS email_open_events (
-                id SERIAL PRIMARY KEY,
-                recipient_id TEXT NOT NULL,
-                opened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (recipient_id) REFERENCES recipients (id) ON DELETE CASCADE
-            )
-        ''')
-
 
         # A/B test results table (Note: PostgreSQL uses SERIAL for auto-incrementing integers)
         cursor.execute('''
@@ -204,7 +193,7 @@ def authenticate_gmail():
     creds = None
 
     # Load existing credentials
-    if os.path.exists('token.json'): # <--- Corrected from os.path_exists
+    if os.path.exists('token.json'):
         creds = Credentials.from_authorized_user_file('token.json', SCOPES)
 
     # If no valid credentials, get new ones
@@ -213,7 +202,7 @@ def authenticate_gmail():
             creds.refresh(Request())
         else:
             # You need to download credentials.json from Google Cloud Console
-            if os.path.exists('credentials.json'): # <--- Corrected from os.path_exists
+            if os.path.exists('credentials.json'):
                 flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
                 creds = flow.run_local_server(port=0)
             else:
@@ -294,51 +283,27 @@ def calculate_ab_metrics(campaign_id):
     metrics = {}
 
     for variation in variations:
-        # Calculate standard metrics for each variation
+        # Calculate metrics for each variation
         cursor.execute(sql.SQL('''
             SELECT
                 COUNT(*) as total_sent,
                 COUNT(CASE WHEN opened_at IS NOT NULL THEN 1 END) as opened,
-                COUNT(CASE WHEN clicked_at IS NOT NULL THEN 1 END) as clicked,
-                COUNT(CASE WHEN converted_at IS NOT NULL THEN 1 END) as converted
-            FROM recipients
+                COUNT(CASE WHEN converted_at IS NOT NULL THEN 1 END) as converted,
+                COUNT(CASE WHEN opened_at IS NOT NULL AND (SELECT COUNT(*) FROM recipients WHERE campaign_id = %s AND variation_assigned = %s AND email_address = r.email_address AND opened_at IS NOT NULL) > 1 THEN 1 END) as re_opened
+            FROM recipients r
             WHERE campaign_id = %s AND variation_assigned = %s AND status = 'sent'
-        '''), [campaign_id, variation])
+        '''), [campaign_id, variation, campaign_id, variation]) #
 
         result = cursor.fetchone()
-        total_sent, opened, clicked, converted = result
-
-        # --- Calculate Re-Open Rate (New Metric) ---
-        reopened_count = 0
-        if opened > 0: # Only calculate if there's at least one open
-            # Find recipients who opened the email at least once (their first open is recorded in recipients.opened_at)
-            # Then, count how many of these have more than 1 entry in email_open_events
-            cursor.execute(sql.SQL('''
-                SELECT COUNT(DISTINCT eoe.recipient_id)
-                FROM email_open_events eoe
-                JOIN recipients r ON eoe.recipient_id = r.id
-                WHERE r.campaign_id = %s
-                  AND r.variation_assigned = %s
-                  AND r.opened_at IS NOT NULL -- ensure they had an initial open
-                GROUP BY eoe.recipient_id
-                HAVING COUNT(eoe.id) > 1; -- Count only those with more than one open event
-            '''), [campaign_id, variation])
-            reopened_recipients_result = cursor.fetchall()
-            reopened_count = len(reopened_recipients_result) # Number of unique recipients who re-opened
-
-        reopen_rate = (reopened_count / opened * 100) if opened > 0 else 0
-
+        total_sent, opened, converted, re_opened = result #
 
         metrics[variation] = {
-            'total_sent': total_sent,
-            'opened': opened,
-            'clicked': clicked,
-            'converted': converted,
-            'open_rate': (opened / total_sent * 100) if total_sent > 0 else 0,
-            'click_rate': (clicked / total_sent * 100) if total_sent > 0 else 0,
-            'conversion_rate': (converted / total_sent * 100) if total_sent > 0 else 0,
-            'click_through_rate': (clicked / opened * 100) if opened > 0 else 0,
-            'reopen_rate': reopen_rate # Add the new metric here
+            'total_sent': total_sent, #
+            'opened': opened, #
+            'converted': converted, #
+            'open_rate': (opened / total_sent * 100) if total_sent > 0 else 0, #
+            'conversion_rate': (converted / total_sent * 100) if total_sent > 0 else 0, #
+            're_open_rate': (re_opened / opened * 100) if opened > 0 else 0 # New re-open rate
         }
 
     cursor.close()
@@ -803,33 +768,13 @@ def tracking_pixel(tracking_id):
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Step 1: Record the FIRST open time in the 'recipients' table (if not already set)
         cursor.execute(sql.SQL('''
             UPDATE recipients
             SET opened_at = CURRENT_TIMESTAMP
             WHERE tracking_id = %s AND opened_at IS NULL
         '''), [tracking_id])
+
         conn.commit()
-
-        # Step 2: Get recipient_id for email_open_events table
-        cursor.execute(sql.SQL('''
-            SELECT id FROM recipients WHERE tracking_id = %s
-        '''), [tracking_id])
-        recipient_data = cursor.fetchone()
-
-        if recipient_data:
-            recipient_id = recipient_data[0]
-            # Step 3: Always insert a new record into email_open_events for every pixel hit
-            cursor.execute(sql.SQL('''
-                INSERT INTO email_open_events (recipient_id, opened_at)
-                VALUES (%s, CURRENT_TIMESTAMP)
-            '''), [recipient_id])
-            conn.commit()
-            print(f"Recorded open event for recipient_id: {recipient_id} via tracking_id: {tracking_id}")
-        else:
-            print(f"Warning: Recipient not found for tracking_id: {tracking_id}")
-
-
         cursor.close()
         # conn.close() # Close conn in finally block
 
