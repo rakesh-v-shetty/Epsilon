@@ -727,6 +727,25 @@
             }
         });
 
+        async function viewResults(campaignId) {
+            showLoading('Fetching A/B test results...');
+            try {
+                const response = await fetch(`/campaign-results/${campaignId}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    document.getElementById('results-display').style.display = 'block';
+                    displayResults(result);
+                } else {
+                    showAlert('Error fetching results: ' + result.error, 'danger');
+                }
+            } catch (error) {
+                showAlert('An error occurred fetching results: ' + error.message, 'danger');
+            } finally {
+                hideLoading();
+            }
+        }
+
         function displayResults(data) {
             document.getElementById('campaign-name-results').textContent = data.campaign.name;
             document.getElementById('campaign-status-results').textContent = data.campaign.status.toUpperCase();
@@ -735,7 +754,7 @@
             const metricsGrid = document.getElementById('metrics-grid');
             metricsGrid.innerHTML = ''; // Clear previous metrics
 
-            // Determine the winner based on Open Rate for now (since re-open rate is not fully tracked)
+            // Determine the winner based on Open Rate
             let highestOpenRate = -1;
             let winningVariation = '';
 
@@ -747,15 +766,14 @@
                 }
             }
 
-
             const chartLabels = [];
             const openRates = [];
-            const reOpenRates = []; // New array for re-open rates
+            const reOpenRates = []; // For re-open rates
+            const conversionRates = []; // Keep conversion rates for now as it's still tracked
 
             for (const variationName in data.metrics) {
                 const metrics = data.metrics[variationName];
                 const card = document.createElement('div');
-                // Assign 'winner' class based on open_rate for now
                 card.className = `metric-card ${variationName === winningVariation ? 'winner' : ''}`;
                 card.innerHTML = `
                     <h4>${variationName.replace('_', ' ')}</h4>
@@ -770,9 +788,10 @@
                 chartLabels.push(variationName.replace('_', ' '));
                 openRates.push(metrics.open_rate);
                 reOpenRates.push(metrics.re_open_rate);
+                conversionRates.push(metrics.conversion_rate); // Add conversion rate to chart data
             }
 
-            createResultsChart({ chartLabels, openRates, reOpenRates });
+            createResultsChart({ chartLabels, openRates, reOpenRates, conversionRates });
         }
 
         function createResultsChart(metrics) {
@@ -799,6 +818,13 @@
                             data: metrics.reOpenRates,
                             backgroundColor: 'rgba(255, 159, 64, 0.7)', /* Orange-ish color */
                             borderColor: 'rgba(255, 159, 64, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Conversion Rate (%)',
+                            data: metrics.conversionRates,
+                            backgroundColor: 'rgba(40, 167, 69, 0.7)', /* Green-ish color */
+                            borderColor: 'rgba(40, 167, 69, 1)',
                             borderWidth: 1
                         }
                     ]
