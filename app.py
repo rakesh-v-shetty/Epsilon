@@ -223,13 +223,15 @@ def create_email_message(to_email, subject, body, tracking_id):
     # Add tracking pixel to HTML version
     tracking_pixel = f'<img src="{BASE_URL}/pixel/{tracking_id}" width="1" height="1" style="display:none;">'
 
-    # Add tracking for clicks to HTML version
-    html_body = body.replace('\n', '<br>')
-    html_body_with_tracking = add_click_tracking(html_body, tracking_id) + tracking_pixel
+    # Convert plain text body to HTML and add tracking
+    html_body = body.replace('\n', '<br>') + tracking_pixel
+
+    # Add click tracking to links
+    html_body = add_click_tracking(html_body, tracking_id)
 
     # Create both plain text and HTML versions
     text_part = MIMEText(body, 'plain')
-    html_part = MIMEText(html_body_with_tracking, 'html')
+    html_part = MIMEText(html_body, 'html')
 
     message.attach(text_part)
     message.attach(html_part)
@@ -282,35 +284,28 @@ def calculate_ab_metrics(campaign_id):
 
     for variation in variations:
         # Calculate metrics for each variation
-        # Note: 're_opened' count with current schema will likely always be 0
-        # as 'opened_at' only stores the first open timestamp per recipient.
-        # To accurately track re-opens, a separate 'email_open_logs' table
-        # would be needed to record each open event.
         cursor.execute(sql.SQL('''
             SELECT
                 COUNT(*) as total_sent,
                 COUNT(CASE WHEN opened_at IS NOT NULL THEN 1 END) as opened,
-                COUNT(CASE WHEN converted_at IS NOT NULL THEN 1 END) as converted,
-                -- The following subquery attempts to count re-opens, but with a single 'opened_at' timestamp
-                -- per recipient in the 'recipients' table, it will always evaluate to 0.
-                COUNT(CASE WHEN opened_at IS NOT NULL AND (
-                    SELECT COUNT(*) FROM recipients r_inner
-                    WHERE r_inner.campaign_id = %s AND r_inner.variation_assigned = %s AND r_inner.email_address = r.email_address AND r_inner.opened_at IS NOT NULL
-                ) > 1 THEN 1 END) as re_opened
-            FROM recipients r
+                COUNT(CASE WHEN clicked_at IS NOT NULL THEN 1 END) as clicked,
+                COUNT(CASE WHEN converted_at IS NOT NULL THEN 1 END) as converted
+            FROM recipients
             WHERE campaign_id = %s AND variation_assigned = %s AND status = 'sent'
-        '''), [campaign_id, variation, campaign_id, variation])
+        '''), [campaign_id, variation])
 
         result = cursor.fetchone()
-        total_sent, opened, converted, re_opened = result
+        total_sent, opened, clicked, converted = result
 
         metrics[variation] = {
             'total_sent': total_sent,
             'opened': opened,
+            'clicked': clicked,
             'converted': converted,
             'open_rate': (opened / total_sent * 100) if total_sent > 0 else 0,
+            'click_rate': (clicked / total_sent * 100) if total_sent > 0 else 0,
             'conversion_rate': (converted / total_sent * 100) if total_sent > 0 else 0,
-            're_open_rate': (re_opened / opened * 100) if opened > 0 else 0 # Will currently be 0% due to schema
+            'click_through_rate': (clicked / opened * 100) if opened > 0 else 0
         }
 
     cursor.close()
@@ -413,6 +408,8 @@ Here's what makes this special:
 ✓ Proven results from our beta testing
 ✓ Limited-time exclusive access
 
+Ready to be among the first to experience this?
+
 [Claim Your Spot Now]
 
 Best,
@@ -435,6 +432,8 @@ What our customers are saying:
 "This exceeded all my expectations" - Sarah M.
 "Finally, a solution that actually works" - David L.
 
+Want to see what all the excitement is about?
+
 [Discover More]
 
 Warmly,
@@ -444,7 +443,6 @@ P.S. Join hundreds of satisfied customers who've already made the switch. 🌟''
     }
 
     return [{"generated_text": f"VARIATION A:\nSUBJECT: {variation_a['subject']}\nBODY: {variation_a['body']}\n\nVARIATION B:\nSUBJECT: {variation_b['subject']}\nBODY: {variation_b['body']}"}]
-
 
 # API Routes
 @app.route('/')
@@ -772,9 +770,6 @@ def tracking_pixel(tracking_id):
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Update opened_at for the first open.
-        # Note: To track true 're-opens', a separate logging table is required,
-        # as this column only stores the initial open timestamp.
         cursor.execute(sql.SQL('''
             UPDATE recipients
             SET opened_at = CURRENT_TIMESTAMP
