@@ -6,7 +6,6 @@
     <title>A/B Testing Dashboard - Email Marketing</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <style>
-        /* General styles */
         * {
             margin: 0;
             padding: 0;
@@ -37,69 +36,58 @@
 
         .header h1 {
             color: #4a4a4a;
-            font-size: 2.8em;
+            font-size: 2.5em;
             margin-bottom: 10px;
-            font-weight: 700;
         }
 
         .header p {
             color: #777;
             font-size: 1.1em;
-            line-height: 1.6;
         }
 
-        /* Tabs styling */
         .tab-container {
             background: rgba(255, 255, 255, 0.95);
             border-radius: 15px;
-            padding: 20px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            margin-bottom: 30px;
         }
 
         .tabs {
             display: flex;
-            justify-content: center;
-            margin-bottom: 25px;
             border-bottom: 1px solid #eee;
         }
 
         .tab-button {
+            flex-grow: 1;
+            padding: 20px;
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #555;
             background: none;
             border: none;
-            padding: 15px 25px;
-            font-size: 1.1em;
-            font-weight: 600;
             cursor: pointer;
-            color: #555;
-            transition: color 0.3s ease, border-bottom 0.3s ease;
-            border-bottom: 3px solid transparent;
-        }
-
-        .tab-button:hover {
-            color: #667eea;
+            outline: none;
+            transition: all 0.3s ease;
+            text-align: center;
         }
 
         .tab-button.active {
+            background: #f8f8f8;
             color: #667eea;
             border-bottom: 3px solid #667eea;
         }
 
-        .tab-pane {
+        .tab-content {
+            padding: 30px;
             display: none;
-            padding: 20px 0;
-            animation: fadeIn 0.5s ease-in-out;
         }
 
-        .tab-pane.active {
+        .tab-content.active {
             display: block;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Forms styling */
+        /* Form Styling */
         .form-group {
             margin-bottom: 20px;
         }
@@ -107,250 +95,216 @@
         .form-group label {
             display: block;
             margin-bottom: 8px;
-            font-weight: 600;
-            color: #444;
+            font-weight: bold;
+            color: #555;
         }
 
         .form-group input[type="text"],
+        .form-group input[type="file"],
         .form-group textarea,
-        .form-group select,
-        .form-group input[type="file"] {
+        .form-group select {
             width: 100%;
-            padding: 12px 15px;
+            padding: 12px;
             border: 1px solid #ddd;
             border-radius: 8px;
             font-size: 1em;
-            transition: border-color 0.3s ease, box-shadow 0.3s ease;
-            resize: vertical;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+            transition: border-color 0.3s ease;
         }
 
         .form-group input[type="text"]:focus,
+        .form-group input[type="file"]:focus,
         .form-group textarea:focus,
-        .form-group select:focus,
-        .form-group input[type="file"]:focus {
+        .form-group select:focus {
             border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
             outline: none;
+        }
+
+        .form-group textarea {
+            min-height: 120px;
+            resize: vertical;
         }
 
         .btn {
             display: inline-block;
-            background-color: #667eea;
-            color: white;
             padding: 12px 25px;
+            background: #667eea;
+            color: white;
             border: none;
             border-radius: 8px;
-            font-size: 1.1em;
-            font-weight: 600;
             cursor: pointer;
+            font-size: 1.1em;
+            font-weight: bold;
             transition: background-color 0.3s ease, transform 0.2s ease;
             text-decoration: none;
             text-align: center;
         }
 
         .btn:hover {
-            background-color: #5a6edb;
+            background: #5a6fe0;
             transform: translateY(-2px);
         }
 
-        .btn:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-            transform: none;
+        .btn-secondary {
+            background: #764ba2;
+            margin-left: 10px;
+        }
+        .btn-secondary:hover {
+            background: #6a3e90;
         }
 
-        /* Alerts */
+        .btn-red {
+            background: #e74c3c;
+        }
+        .btn-red:hover {
+            background: #c0392b;
+        }
+
+        .campaign-list, .campaign-detail {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+        }
+
+        .campaign-list ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .campaign-list li {
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .campaign-list li:last-child {
+            border-bottom: none;
+        }
+
+        .campaign-list li span {
+            font-weight: bold;
+            color: #4a4a4a;
+        }
+
+        .campaign-list li .actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .campaign-list li .actions button {
+            padding: 8px 15px;
+            font-size: 0.9em;
+            border-radius: 5px;
+        }
+
+        .campaign-detail h3 {
+            color: #4a4a4a;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+
+        .campaign-detail p {
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        .campaign-detail .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .campaign-detail .stat-box {
+            background: #f8f8f8;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+            text-align: center;
+        }
+
+        .campaign-detail .stat-box h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+
+        .campaign-detail .stat-box p {
+            font-size: 2em;
+            font-weight: bold;
+            color: #4a4a4a;
+        }
+
+        .variation-results {
+            margin-top: 30px;
+        }
+
+        .variation-results h4 {
+            color: #4a4a4a;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .variation-card {
+            background: #f8f8f8;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .variation-card h5 {
+            color: #764ba2;
+            margin-bottom: 10px;
+            font-size: 1.3em;
+        }
+
+        .variation-card ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .variation-card li {
+            margin-bottom: 8px;
+            color: #555;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+            margin-top: 30px;
+        }
+
         .alert {
             padding: 15px;
             margin-bottom: 20px;
             border-radius: 8px;
-            font-weight: 500;
-            display: none; /* Hidden by default */
-            animation: fadeIn 0.5s ease-in-out;
+            font-weight: bold;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
         }
 
-        .alert.alert-success {
+        .alert.show {
+            opacity: 1;
+        }
+
+        .alert-success {
             background-color: #d4edda;
             color: #155724;
             border: 1px solid #c3e6cb;
         }
 
-        .alert.alert-danger {
+        .alert-danger {
             background-color: #f8d7da;
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
 
-        .alert.alert-info {
-            background-color: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-
-        /* Campaign variations display */
-        .email-variations {
-            margin-top: 30px;
-            border-top: 1px solid #eee;
-            padding-top: 20px;
-        }
-
-        .email-variation-card {
-            background-color: #f9f9f9;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-            border: 1px solid #e0e0e0;
-        }
-
-        .email-variation-card h3 {
-            color: #667eea;
-            margin-bottom: 10px;
-            font-size: 1.4em;
-        }
-
-        .email-variation-card p {
-            font-size: 0.95em;
-            line-height: 1.6;
-            margin-bottom: 10px;
-            color: #555;
-            white-space: pre-wrap; /* Preserve line breaks */
-        }
-
-        .email-variation-card strong {
-            color: #333;
-        }
-
-        /* Manage Campaigns */
-        #campaigns-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-
-        .campaign-card {
-            background-color: #f9f9f9;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-            border: 1px solid #e0e0e0;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-
-        .campaign-card h3 {
-            color: #667eea;
-            margin-bottom: 10px;
-            font-size: 1.5em;
-        }
-
-        .campaign-card p {
-            margin-bottom: 8px;
-            font-size: 0.95em;
-            color: #555;
-        }
-
-        .campaign-card .status {
-            font-weight: 600;
-            padding: 5px 10px;
-            border-radius: 5px;
-            display: inline-block;
-            margin-top: 10px;
-        }
-
-        .campaign-card .status.draft { background-color: #ffefd5; color: #ffa500; }
-        .campaign-card .status.sent { background-color: #d4edda; color: #155724; }
-        .campaign-card .status.active { background-color: #d1ecf1; color: #0c5460; }
-        .campaign-card .status.failed { background-color: #f8d7da; color: #721c24; }
-
-        .campaign-card .btn {
-            width: 100%;
-            margin-top: 15px;
-        }
-
-        /* View Results */
-        #results-display {
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid #eee;
-        }
-
-        #results-display h3 {
-            text-align: center;
-            color: #4a4a4a;
-            margin-bottom: 25px;
-            font-size: 1.8em;
-        }
-
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 25px;
-            margin-top: 25px;
-        }
-
-        .metric-card {
-            background-color: #ffffff;
-            border-radius: 12px;
-            padding: 25px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
-            text-align: center;
-            border: 1px solid #e0e0e0;
-        }
-
-        .metric-card.winner {
-            border: 3px solid #28a745;
-            box-shadow: 0 0 20px rgba(40, 167, 69, 0.3);
-        }
-
-        .metric-card h4 {
-            color: #667eea;
-            font-size: 1.6em;
-            margin-bottom: 15px;
-        }
-
-        .metric-card p {
-            font-size: 1em;
-            color: #666;
-            margin-bottom: 5px;
-        }
-
-        .metric-card .value {
-            font-size: 2.2em;
-            font-weight: 700;
-            color: #333;
-            margin-bottom: 10px;
-        }
-
-        .metric-card .rate {
-            font-size: 1.8em;
-            font-weight: 700;
-            color: #28a745;
-        }
-
-        .metric-card .rate.low {
-            color: #dc3545;
-        }
-
-        .metric-card .rate.medium {
-            color: #ffc107;
-        }
-
-        .chart-container {
-            margin-top: 40px;
-            background-color: #ffffff;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
-            max-width: 900px;
-            margin-left: auto;
-            margin-right: auto;
-            border: 1px solid #e0e0e0;
-        }
-
-        /* Loading Overlay */
         #loading-overlay {
             position: fixed;
             top: 0;
@@ -364,17 +318,16 @@
             z-index: 9999;
             color: white;
             font-size: 1.5em;
-            flex-direction: column;
         }
 
-        .spinner {
-            border: 8px solid rgba(255, 255, 255, 0.3);
-            border-top: 8px solid #667eea;
+        .loading .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
             border-radius: 50%;
-            width: 60px;
-            height: 60px;
+            width: 50px;
+            height: 50px;
             animation: spin 1s linear infinite;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
         @keyframes spin {
@@ -382,451 +335,361 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* Responsive design */
-        @media (max-width: 768px) {
-            .header h1 {
-                font-size: 2em;
-            }
-            .tab-button {
-                padding: 12px 15px;
-                font-size: 0.9em;
-            }
-            .container {
-                padding: 15px;
-            }
-            .email-variation-card, .campaign-card, .metric-card {
-                padding: 15px;
-            }
-            .metrics-grid {
-                grid-template-columns: 1fr;
-            }
+        .loading p {
+            text-align: center;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>A/B Testing Dashboard</h1>
-            <p>Effortlessly create, manage, and analyze your email marketing A/B tests with AI-powered content generation and robust tracking.</p>
+            <h1>A/B Testing Email Marketing</h1>
+            <p>Create, send, and analyze your email campaigns with AI-generated variations.</p>
         </div>
 
         <div class="tab-container">
             <div class="tabs">
-                <button class="tab-button active" onclick="showTab('create-campaign')">Create Campaign</button>
-                <button class="tab-button" onclick="showTab('manage-campaigns')">Manage Campaigns</button>
-                <button class="tab-button" onclick="showTab('view-results')">View Results</button>
+                <button class="tab-button active" onclick="showTab('create-campaign-tab')">Create New Campaign</button>
+                <button class="tab-button" onclick="showTab('manage-campaigns-tab')">Manage Campaigns</button>
             </div>
 
-            <div id="create-campaign" class="tab-pane active">
-                <h2>Create New A/B Test Campaign</h2>
-                <form id="campaign-form">
+            <div id="create-campaign-tab" class="tab-content active">
+                <form id="create-campaign-form">
+                    <h2>New Campaign Details</h2>
                     <div class="form-group">
-                        <label for="companyName">Company Name:</label>
-                        <input type="text" id="companyName" name="company_name" required>
+                        <label for="company_name">Your Company Name:</label>
+                        <input type="text" id="company_name" name="company_name" required>
                     </div>
                     <div class="form-group">
-                        <label for="productName">Product/Service Name:</label>
-                        <input type="text" id="productName" name="product_name" required>
+                        <label for="product_name">Product/Service Name:</label>
+                        <input type="text" id="product_name" name="product_name" required>
                     </div>
                     <div class="form-group">
-                        <label for="offerDetails">Offer/Campaign Focus (e.g., "15% off first purchase", "Free trial", "New feature launch"):</label>
-                        <textarea id="offerDetails" name="offer_details" rows="3" required></textarea>
+                        <label for="offer_details">Campaign Offer Details (e.g., "50% off for first 3 months"):</label>
+                        <textarea id="offer_details" name="offer_details" required></textarea>
                     </div>
                     <div class="form-group">
-                        <label for="campaignType">Campaign Type:</label>
-                        <select id="campaignType" name="campaign_type" required>
+                        <label for="campaign_type">Campaign Type:</label>
+                        <select id="campaign_type" name="campaign_type" required>
                             <option value="">Select Type</option>
                             <option value="promotional">Promotional</option>
-                            <option value="welcome">Welcome Series</option>
-                            <option value="abandonment">Cart Abandonment</option>
-                            <option value="re-engagement">Re-engagement</option>
                             <option value="newsletter">Newsletter</option>
-                            <option value="product_update">Product Update</option>
+                            <option value="product_launch">Product Launch</option>
+                            <option value="re_engagement">Re-Engagement</option>
+                            <option value="abandoned_cart">Abandoned Cart</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="targetAudience">Target Audience (Optional, e.g., "small business owners", "tech enthusiasts"):</label>
-                        <input type="text" id="targetAudience" name="target_audience">
+                        <label for="target_audience">Target Audience (Optional, e.g., "small business owners"):</label>
+                        <input type="text" id="target_audience" name="target_audience">
                     </div>
                     <button type="submit" class="btn">Generate Email Variations</button>
                 </form>
-
-                <div id="variation-display" style="display: none;">
-                    <div class="email-variations">
-                        <h3>Generated Email Variations:</h3>
-                        <div id="variationA" class="email-variation-card"></div>
-                        <div id="variationB" class="email-variation-card"></div>
-                    </div>
-                    <p>Next: Upload your recipient list (CSV with 'email', 'first\_name', 'last\_name' columns).</p>
-                    <div class="form-group">
-                        <label for="recipientFile">Upload Recipient CSV:</label>
-                        <input type="file" id="recipientFile" accept=".csv" required>
-                    </div>
-                    <button id="upload-recipients-btn" class="btn">Upload Recipients</button>
-                    <button id="send-campaign-btn" class="btn" disabled>Send Campaign</button>
-                </div>
             </div>
 
-            <div id="manage-campaigns" class="tab-pane">
-                <h2>Manage Existing Campaigns</h2>
-                <div id="campaigns-list">
+            <div id="manage-campaigns-tab" class="tab-content">
+                <h2>Your Campaigns</h2>
+                <div class="campaign-list" id="campaign-list-container">
                     <p>Loading campaigns...</p>
                 </div>
-            </div>
+                <div id="campaign-detail-view" class="campaign-detail" style="display:none;">
+                    <button class="btn btn-secondary" onclick="hideCampaignDetail()">← Back to Campaigns</button>
+                    <h3 id="campaign-detail-name" style="margin-top: 20px;"></h3>
+                    <p>Status: <span id="campaign-detail-status"></span></p>
+                    <p>Total Recipients: <span id="campaign-detail-total-recipients"></span></p>
 
-            <div id="view-results" class="tab-pane">
-                <h2>View Campaign Results</h2>
-                <div class="form-group">
-                    <label for="selectCampaignResults">Select Campaign:</label>
-                    <select id="selectCampaignResults" class="form-control">
-                        <option value="">Select a sent campaign</option>
-                    </select>
-                </div>
-                <button id="view-results-btn" class="btn" disabled>View Results</button>
-                <div id="results-display" style="display: none;">
-                    <h3>A/B Test Results for <span id="campaign-name-results"></span></h3>
-                    <p>Status: <span id="campaign-status-results"></span> | Total Recipients: <span id="campaign-total-recipients-results"></span></p>
-                    <div class="metrics-grid" id="metrics-grid">
+                    <div class="stats-grid" id="overall-stats-grid">
                         </div>
+
+                    <div class="variation-results" id="variation-results-container">
+                        <h4>Variation Performance</h4>
+                        </div>
+
                     <div class="chart-container">
-                        <canvas id="resultsChart"></canvas>
+                        <canvas id="campaignMetricsChart"></canvas>
                     </div>
+
+                    <h4 style="margin-top: 30px;">Upload Recipients</h4>
+                    <form id="upload-recipients-form">
+                        <input type="hidden" id="current_campaign_id" name="campaign_id">
+                        <div class="form-group">
+                            <label for="recipient_csv">Upload CSV (Email, First Name, Last Name):</label>
+                            <input type="file" id="recipient_csv" name="file" accept=".csv" required>
+                        </div>
+                        <button type="submit" class="btn">Upload & Assign Recipients</button>
+                    </form>
+
+                    <h4 style="margin-top: 30px;">Send Campaign</h4>
+                    <p>Once recipients are uploaded, you can send the campaign emails.</p>
+                    <button class="btn btn-red" id="send-campaign-btn" onclick="sendCampaign()">Send Campaign Emails</button>
+                    <div id="send-campaign-status" style="margin-top: 10px; font-weight: bold;"></div>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        // Inject BASE_URL from Flask
-        const BASE_URL = "{{ base_url }}"; // This will be rendered by Jinja2
+        const BASE_URL = "{{ base_url }}"; // Flask template variable
 
-        let currentCampaignId = null;
-        let resultsChartInstance = null; // To store Chart.js instance
-
-        function showTab(tabName) {
-            document.querySelectorAll('.tab-pane').forEach(pane => {
-                pane.classList.remove('active');
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
             });
             document.querySelectorAll('.tab-button').forEach(button => {
                 button.classList.remove('active');
             });
+            document.getElementById(tabId).classList.add('active');
+            document.querySelector(`button[onclick="showTab('${tabId}')"]`).classList.add('active');
 
-            document.getElementById(tabName).classList.add('active');
-            document.querySelector(`.tab-button[onclick="showTab('${tabName}')"]`).classList.add('active');
-
-            // Specific actions when switching tabs
-            if (tabName === 'manage-campaigns') {
+            if (tabId === 'manage-campaigns-tab') {
                 loadCampaigns();
-            } else if (tabName === 'view-results') {
-                loadCampaignOptions();
-                document.getElementById('results-display').style.display = 'none'; // Hide results until selected
-                document.getElementById('view-results-btn').disabled = true; // Disable button until selection
-                document.getElementById('selectCampaignResults').value = ''; // Reset dropdown
             }
         }
 
-        // --- Create Campaign Logic ---
-        document.getElementById('campaign-form').addEventListener('submit', async function(event) {
-            event.preventDefault();
-            showLoading('Generating email variations using AI...');
+        document.getElementById('create-campaign-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            showLoading("Generating AI email variations...");
 
             const formData = new FormData(this);
             const data = Object.fromEntries(formData.entries());
 
             try {
-                const response = await fetch('/create-campaign', {
+                const response = await fetch(`${BASE_URL}/create-campaign`, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
+                        'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(data),
+                    body: JSON.stringify(data)
                 });
                 const result = await response.json();
+                hideLoading();
 
                 if (result.success) {
-                    currentCampaignId = result.campaign_id;
-                    displayVariations(result.variations);
-                    document.getElementById('variation-display').style.display = 'block';
-                    document.getElementById('send-campaign-btn').disabled = true; // Disable until recipients uploaded
-                    showAlert('Campaign created and variations generated!', 'success');
+                    showAlert('Campaign created and variations generated successfully!', 'success');
+                    this.reset();
+                    loadCampaigns(); // Refresh campaign list
+                    showTab('manage-campaigns-tab'); // Switch to manage tab
+                    showCampaignDetail(result.campaign_id); // Show new campaign's details
                 } else {
-                    showAlert('Error: ' + result.error, 'danger');
+                    showAlert(`Error creating campaign: ${result.error}`, 'danger');
                 }
             } catch (error) {
-                showAlert('An error occurred: ' + error.message, 'danger');
-            } finally {
                 hideLoading();
+                console.error('Error:', error);
+                showAlert('An unexpected error occurred. Please try again.', 'danger');
             }
         });
 
-        function displayVariations(variations) {
-            const variationA = document.getElementById('variationA');
-            const variationB = document.getElementById('variationB');
-
-            variationA.innerHTML = `<h3>Variation A</h3>
-                                    <p><strong>Subject:</strong> ${variations[0].subject}</p>
-                                    <p><strong>Body:</strong> ${variations[0].body}</p>`;
-            variationB.innerHTML = `<h3>Variation B</h3>
-                                    <p><strong>Subject:</strong> ${variations[1].subject}</p>
-                                    <p><strong>Body:</strong> ${variations[1].body}</p>`;
-        }
-
-        // --- Upload Recipients Logic ---
-        document.getElementById('upload-recipients-btn').addEventListener('click', async function() {
-            const recipientFile = document.getElementById('recipientFile').files[0];
-            if (!recipientFile || !currentCampaignId) {
-                showAlert('Please select a CSV file and ensure a campaign is created.', 'info');
-                return;
-            }
-
-            showLoading('Uploading recipients...');
-
-            const formData = new FormData();
-            formData.append('file', recipientFile);
-            formData.append('campaign_id', currentCampaignId);
-
-            try {
-                const response = await fetch('/upload-recipients', {
-                    method: 'POST',
-                    body: formData,
-                });
-                const result = await response.json();
-
-                if (result.success) {
-                    showAlert(result.message, 'success');
-                    document.getElementById('send-campaign-btn').disabled = false; // Enable send button
-                } else {
-                    showAlert('Error uploading recipients: ' + result.error, 'danger');
-                }
-            } catch (error) {
-                showAlert('An error occurred during upload: ' + error.message, 'danger');
-            } finally {
-                hideLoading();
-            }
-        });
-
-        // --- Send Campaign Logic ---
-        document.getElementById('send-campaign-btn').addEventListener('click', async function() {
-            if (!currentCampaignId) {
-                showAlert('No campaign selected or created.', 'info');
-                return;
-            }
-
-            if (!confirm('Are you sure you want to send this campaign? This action cannot be undone.')) {
-                return;
-            }
-
-            showLoading('Sending emails...');
-
-            try {
-                const response = await fetch('/send-campaign', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ campaign_id: currentCampaignId }),
-                });
-                const result = await response.json();
-
-                if (result.success) {
-                    let message = `Campaign sent! ${result.sent_count} out of ${result.total_recipients} emails dispatched.`;
-                    if (result.errors && result.errors.length > 0) {
-                        message += ` Some errors occurred: ${result.errors.join('; ')}`;
-                        showAlert(message, 'warning');
-                    } else {
-                        showAlert(message, 'success');
-                    }
-                    // Refresh campaign list after sending
-                    loadCampaigns();
-                } else {
-                    showAlert('Error sending campaign: ' + result.error, 'danger');
-                }
-            } catch (error) {
-                showAlert('An error occurred during sending: ' + error.message, 'danger');
-            } finally {
-                hideLoading();
-            }
-        });
-
-        // --- Manage Campaigns Logic ---
         async function loadCampaigns() {
-            showLoading('Loading campaigns...');
+            showLoading("Loading campaigns...");
             try {
-                const response = await fetch('/campaigns');
+                const response = await fetch(`${BASE_URL}/campaigns`);
                 const result = await response.json();
-
-                if (result.success) {
-                    displayCampaigns(result.campaigns);
-                } else {
-                    showAlert('Error loading campaigns: ' + result.error, 'danger');
-                }
-            } catch (error) {
-                showAlert('An error occurred loading campaigns: ' + error.message, 'danger');
-            } finally {
                 hideLoading();
-            }
-        }
 
-        function displayCampaigns(campaigns) {
-            const campaignsList = document.getElementById('campaigns-list');
-            campaignsList.innerHTML = ''; // Clear previous list
+                const listContainer = document.getElementById('campaign-list-container');
+                listContainer.innerHTML = ''; // Clear previous list
 
-            if (campaigns.length === 0) {
-                campaignsList.innerHTML = '<p>No campaigns found. Create one to get started!</p>';
-                return;
-            }
-
-            campaigns.forEach(campaign => {
-                const card = document.createElement('div');
-                card.className = 'campaign-card';
-                card.innerHTML = `
-                    <h3>${campaign.name}</h3>
-                    <p><strong>Created:</strong> ${new Date(campaign.created_at).toLocaleString()}</p>
-                    <p><strong>Recipients:</strong> ${campaign.total_recipients}</p>
-                    <p><strong>Status:</strong> <span class="status ${campaign.status}">${campaign.status.toUpperCase()}</span></p>
-                    <button class="btn" onclick="viewResults('${campaign.id}')">View Results</button>
-                `;
-                campaignsList.appendChild(card);
-            });
-        }
-
-        // --- View Results Logic ---
-        async function loadCampaignOptions() {
-            const selectElement = document.getElementById('selectCampaignResults');
-            selectElement.innerHTML = '<option value="">Select a sent campaign</option>'; // Reset
-
-            try {
-                const response = await fetch('/campaigns');
-                const result = await response.json();
-
-                if (result.success) {
-                    result.campaigns.filter(c => c.status === 'sent').forEach(campaign => {
-                        const option = document.createElement('option');
-                        option.value = campaign.id;
-                        option.textContent = campaign.name;
-                        selectElement.appendChild(option);
+                if (result.success && result.campaigns.length > 0) {
+                    const ul = document.createElement('ul');
+                    result.campaigns.forEach(campaign => {
+                        const li = document.createElement('li');
+                        li.innerHTML = `
+                            <span>${campaign.name} (${campaign.status.toUpperCase()}) - ${new Date(campaign.created_at).toLocaleDateString()}</span>
+                            <div class="actions">
+                                <button class="btn" onclick="showCampaignDetail('${campaign.id}')">View Results</button>
+                            </div>
+                        `;
+                        ul.appendChild(li);
                     });
+                    listContainer.appendChild(ul);
                 } else {
-                    showAlert('Error loading campaign options: ' + result.error, 'danger');
+                    listContainer.innerHTML = '<p>No campaigns found. Create one to get started!</p>';
                 }
             } catch (error) {
-                showAlert('An error occurred loading campaign options: ' + error.message, 'danger');
+                hideLoading();
+                console.error('Error loading campaigns:', error);
+                showAlert('Failed to load campaigns. Please try again.', 'danger');
             }
         }
 
-        document.getElementById('selectCampaignResults').addEventListener('change', function() {
-            document.getElementById('view-results-btn').disabled = !this.value;
-        });
+        let myChart; // To store the Chart.js instance
 
-        document.getElementById('view-results-btn').addEventListener('click', function() {
-            const campaignId = document.getElementById('selectCampaignResults').value;
-            if (campaignId) {
-                viewResults(campaignId);
-            } else {
-                showAlert('Please select a campaign to view results.', 'info');
-            }
-        });
-
-        async function viewResults(campaignId) {
-            showLoading('Fetching A/B test results...');
+        async function showCampaignDetail(campaignId) {
+            showLoading("Loading campaign results...");
             try {
-                const response = await fetch(`/campaign-results/${campaignId}`);
+                const response = await fetch(`${BASE_URL}/campaign-results/${campaignId}`);
                 const result = await response.json();
+                hideLoading();
 
                 if (result.success) {
-                    document.getElementById('results-display').style.display = 'block';
-                    displayResults(result);
+                    const campaign = result.campaign;
+                    const metrics = result.metrics;
+
+                    document.getElementById('campaign-detail-name').textContent = `Campaign: ${campaign.name}`;
+                    document.getElementById('campaign-detail-status').textContent = campaign.status.toUpperCase();
+                    document.getElementById('campaign-detail-total-recipients').textContent = campaign.total_recipients;
+                    document.getElementById('current_campaign_id').value = campaignId;
+
+                    // Hide send button if campaign already sent
+                    const sendBtn = document.getElementById('send-campaign-btn');
+                    if (campaign.status === 'sent') {
+                        sendBtn.style.display = 'none';
+                        document.getElementById('send-campaign-status').textContent = 'This campaign has been sent.';
+                    } else {
+                        sendBtn.style.display = 'inline-block';
+                        document.getElementById('send-campaign-status').textContent = '';
+                    }
+
+                    renderCampaignResults(metrics, campaign.total_recipients);
+                    renderChart(metrics);
+
+                    document.getElementById('campaign-list-container').style.display = 'none';
+                    document.getElementById('campaign-detail-view').style.display = 'block';
                 } else {
-                    showAlert('Error fetching results: ' + result.error, 'danger');
+                    showAlert(`Error loading campaign details: ${result.error}`, 'danger');
                 }
             } catch (error) {
-                showAlert('An error occurred fetching results: ' + error.message, 'danger');
-            } finally {
                 hideLoading();
+                console.error('Error loading campaign detail:', error);
+                showAlert('Failed to load campaign details. Please try again.', 'danger');
             }
         }
 
-        function displayResults(data) {
-            document.getElementById('campaign-name-results').textContent = data.campaign.name;
-            document.getElementById('campaign-status-results').textContent = data.campaign.status.toUpperCase();
-            document.getElementById('campaign-total-recipients-results').textContent = data.campaign.total_recipients;
+        function hideCampaignDetail() {
+            document.getElementById('campaign-detail-view').style.display = 'none';
+            document.getElementById('campaign-list-container').style.display = 'block';
+            loadCampaigns(); // Reload list to ensure status updates
+        }
 
-            const metricsGrid = document.getElementById('metrics-grid');
-            metricsGrid.innerHTML = ''; // Clear previous metrics
+        function renderCampaignResults(metrics, totalRecipients) {
+            const variationResultsContainer = document.getElementById('variation-results-container');
+            variationResultsContainer.innerHTML = '<h4>Variation Performance</h4>'; // Clear previous results
 
-            let highestConversionRate = -1;
-            let winningVariation = '';
+            const overallStatsGrid = document.getElementById('overall-stats-grid');
+            overallStatsGrid.innerHTML = ''; // Clear previous overall stats
 
-            // Determine the winner first
-            for (const variationName in data.metrics) {
-                const metrics = data.metrics[variationName];
-                if (metrics.conversion_rate > highestConversionRate) {
-                    highestConversionRate = metrics.conversion_rate;
-                    winningVariation = variationName;
-                }
-            }
+            let overallOpened = 0;
+            let overallClicked = 0;
+            let overallConverted = 0;
+            let overallReopened = 0; // New: Overall Reopened
+            let overallSent = 0;
 
-            const chartLabels = [];
-            const openRates = [];
-            const clickRates = [];
-            const conversionRates = [];
+            for (const variationName in metrics) {
+                const metric = metrics[variationName];
+                overallOpened += metric.opened;
+                overallClicked += metric.clicked;
+                overallConverted += metric.converted;
+                overallReopened += (metric.reopen_rate / 100) * metric.opened; // Approximate number from rate
+                overallSent += metric.total_sent;
 
-            for (const variationName in data.metrics) {
-                const metrics = data.metrics[variationName];
-                const card = document.createElement('div');
-                card.className = `metric-card ${variationName === winningVariation ? 'winner' : ''}`;
-                card.innerHTML = `
-                    <h4>${variationName.replace('_', ' ')}</h4>
-                    <p>Total Sent: <span class="value">${metrics.total_sent}</span></p>
-                    <p>Opened: <span class="value">${metrics.opened}</span></p>
-                    <p>Clicked: <span class="value">${metrics.clicked}</span></p>
-                    <p>Converted: <span class="value">${metrics.converted}</span></p>
-                    <p>Open Rate: <span class="rate ${metrics.open_rate > 50 ? 'high' : metrics.open_rate > 20 ? 'medium' : 'low'}">${metrics.open_rate.toFixed(2)}%</span></p>
-                    <p>Click Rate: <span class="rate ${metrics.click_rate > 10 ? 'high' : metrics.click_rate > 3 ? 'medium' : 'low'}">${metrics.click_rate.toFixed(2)}%</span></p>
-                    <p>Conversion Rate: <span class="rate ${metrics.conversion_rate > 5 ? 'high' : metrics.conversion_rate > 1 ? 'medium' : 'low'}">${metrics.conversion_rate.toFixed(2)}%</span></p>
+                const variationCard = document.createElement('div');
+                variationCard.classList.add('variation-card');
+                variationCard.innerHTML = `
+                    <h5>${variationName}</h5>
+                    <ul>
+                        <li>Sent: <strong>${metric.total_sent}</strong></li>
+                        <li>Opened: <strong>${metric.opened}</strong> (${metric.open_rate.toFixed(2)}%)</li>
+                        <li>Clicked: <strong>${metric.clicked}</strong> (${metric.click_rate.toFixed(2)}% of sent)</li>
+                        <li>Re-Opened: <strong>${((metric.reopen_rate / 100) * metric.opened).toFixed(0)}</strong> (${metric.reopen_rate.toFixed(2)}% of opened)</li>
+                        <li>Conversions: <strong>${metric.converted}</strong> (${metric.conversion_rate.toFixed(2)}%)</li>
+                        <li>Click-to-Open Rate (CTOR): <strong>${metric.click_through_rate.toFixed(2)}%</strong></li>
+                    </ul>
                 `;
-                metricsGrid.appendChild(card);
-
-                chartLabels.push(variationName.replace('_', ' '));
-                openRates.push(metrics.open_rate);
-                clickRates.push(metrics.click_rate);
-                conversionRates.push(metrics.conversion_rate);
+                variationResultsContainer.appendChild(variationCard);
             }
 
-            createResultsChart({ chartLabels, openRates, clickRates, conversionRates });
+            // Render overall stats
+            const overallOpenRate = (overallOpened / overallSent * 100) || 0;
+            const overallClickRate = (overallClicked / overallSent * 100) || 0;
+            const overallConversionRate = (overallConverted / overallSent * 100) || 0;
+            const overallClickToOpenRate = (overallClicked / overallOpened * 100) || 0;
+            const overallReopenRate = (overallReopened / overallOpened * 100) || 0; // New: Overall Reopen Rate
+
+            overallStatsGrid.innerHTML = `
+                <div class="stat-box">
+                    <h4>Emails Sent</h4>
+                    <p>${overallSent}</p>
+                </div>
+                <div class="stat-box">
+                    <h4>Total Opened</h4>
+                    <p>${overallOpened}</p>
+                </div>
+                <div class="stat-box">
+                    <h4>Total Clicks</h4>
+                    <p>${overallClicked}</p>
+                </div>
+                <div class="stat-box">
+                    <h4>Total Conversions</h4>
+                    <p>${overallConverted}</p>
+                </div>
+                <div class="stat-box">
+                    <h4>Overall Open Rate</h4>
+                    <p>${overallOpenRate.toFixed(2)}%</p>
+                </div>
+                <div class="stat-box">
+                    <h4>Overall Click Rate (CTR)</h4>
+                    <p>${overallClickRate.toFixed(2)}%</p>
+                </div>
+                <div class="stat-box">
+                    <h4>Overall Re-Open Rate</h4>
+                    <p>${overallReopenRate.toFixed(2)}%</p>
+                </div>
+                <div class="stat-box">
+                    <h4>Overall Conversion Rate</h4>
+                    <p>${overallConversionRate.toFixed(2)}%</p>
+                </div>
+                <div class="stat-box">
+                    <h4>Overall Click-to-Open Rate (CTOR)</h4>
+                    <p>${overallClickToOpenRate.toFixed(2)}%</p>
+                </div>
+            `;
         }
 
-        function createResultsChart(metrics) {
-            const ctx = document.getElementById('resultsChart').getContext('2d');
+        function renderChart(metrics) {
+            const ctx = document.getElementById('campaignMetricsChart').getContext('2d');
 
-            if (resultsChartInstance) {
-                resultsChartInstance.destroy(); // Destroy previous chart instance
+            if (myChart) {
+                myChart.destroy(); // Destroy previous chart instance
             }
 
-            resultsChartInstance = new Chart(ctx, {
+            const labels = Object.keys(metrics);
+            const openRates = labels.map(label => metrics[label].open_rate.toFixed(2));
+            const clickRates = labels.map(label => metrics[label].click_rate.toFixed(2));
+            const conversionRates = labels.map(label => metrics[label].conversion_rate.toFixed(2));
+            const reopenRates = labels.map(label => metrics[label].reopen_rate.toFixed(2)); // New: Re-Open Rates
+
+            myChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: metrics.chartLabels,
+                    labels: labels,
                     datasets: [
                         {
                             label: 'Open Rate (%)',
-                            data: metrics.openRates,
+                            data: openRates,
                             backgroundColor: 'rgba(102, 126, 234, 0.7)',
                             borderColor: 'rgba(102, 126, 234, 1)',
                             borderWidth: 1
                         },
                         {
-                            label: 'Click Rate (%)',
-                            data: metrics.clickRates,
+                            label: 'Click Rate (CTR) (%)',
+                            data: clickRates,
                             backgroundColor: 'rgba(118, 75, 162, 0.7)',
                             borderColor: 'rgba(118, 75, 162, 1)',
                             borderWidth: 1
                         },
                         {
+                            label: 'Re-Open Rate (%)', // New: Dataset for Re-Open Rate
+                            data: reopenRates,
+                            backgroundColor: 'rgba(255, 159, 64, 0.7)', // A new color
+                            borderColor: 'rgba(255, 159, 64, 1)',
+                            borderWidth: 1
+                        },
+                        {
                             label: 'Conversion Rate (%)',
-                            data: metrics.conversionRates,
-                            backgroundColor: 'rgba(40, 167, 69, 0.7)',
-                            borderColor: 'rgba(40, 167, 69, 1)',
+                            data: conversionRates,
+                            backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
                             borderWidth: 1
                         }
                     ]
@@ -842,22 +705,84 @@
                                 text: 'Percentage (%)'
                             }
                         }
-                    },
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: 'Email A/B Test Performance Comparison',
-                            font: {
-                                size: 16
-                            }
-                        }
                     }
                 }
             });
         }
 
+        document.getElementById('upload-recipients-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            showLoading("Uploading recipients...");
 
-        // --- Utility functions ---
+            const campaignId = document.getElementById('current_campaign_id').value;
+            const fileInput = document.getElementById('recipient_csv');
+            const formData = new FormData();
+            formData.append('campaign_id', campaignId);
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const response = await fetch(`${BASE_URL}/upload-recipients`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                hideLoading();
+
+                if (result.success) {
+                    showAlert(result.message, 'success');
+                    // Reload campaign detail to show updated total recipients
+                    showCampaignDetail(campaignId);
+                    fileInput.value = ''; // Clear file input
+                } else {
+                    showAlert(`Error uploading recipients: ${result.error}`, 'danger');
+                }
+            } catch (error) {
+                hideLoading();
+                console.error('Error uploading recipients:', error);
+                showAlert('An unexpected error occurred during upload. Please try again.', 'danger');
+            }
+        });
+
+        async function sendCampaign() {
+            if (!confirm('Are you sure you want to send this campaign? This action cannot be undone.')) {
+                return;
+            }
+
+            showLoading("Sending campaign emails. This may take a while...");
+
+            const campaignId = document.getElementById('current_campaign_id').value;
+            document.getElementById('send-campaign-btn').disabled = true; // Disable button to prevent double-clicks
+
+            try {
+                const response = await fetch(`${BASE_URL}/send-campaign`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ campaign_id: campaignId })
+                });
+                const result = await response.json();
+                hideLoading();
+
+                if (result.success) {
+                    showAlert(`Campaign sent to ${result.sent_count} recipients!`, 'success');
+                    if (result.errors && result.errors.length > 0) {
+                        showAlert(`Some emails failed to send: ${result.errors.join('; ')}`, 'danger');
+                    }
+                    // Reload campaign detail to update status
+                    showCampaignDetail(campaignId);
+                } else {
+                    showAlert(`Error sending campaign: ${result.error}`, 'danger');
+                }
+            } catch (error) {
+                hideLoading();
+                console.error('Error sending campaign:', error);
+                showAlert('An unexpected error occurred during sending. Please try again.', 'danger');
+            } finally {
+                document.getElementById('send-campaign-btn').disabled = false;
+            }
+        }
+
         function showAlert(message, type) {
             const existingAlert = document.querySelector('.alert');
             if (existingAlert) {
@@ -867,12 +792,16 @@
             const alert = document.createElement('div');
             alert.className = `alert alert-${type}`;
             alert.innerHTML = message;
-            alert.style.display = 'block'; // Make sure it's visible
 
             document.querySelector('.container').insertBefore(alert, document.querySelector('.tab-container'));
 
             setTimeout(() => {
-                alert.remove();
+                alert.classList.add('show');
+            }, 10); // Small delay to trigger transition
+
+            setTimeout(() => {
+                alert.classList.remove('show');
+                alert.addEventListener('transitionend', () => alert.remove(), {once: true});
             }, 5000);
         }
 
@@ -891,14 +820,11 @@
                 left: 0;
                 width: 100%;
                 height: 100%;
-                background: rgba(0, 0, 0, 0.6);
+                background: rgba(0, 0, 0, 0.5);
                 display: flex;
                 justify-content: center;
                 align-items: center;
                 z-index: 9999;
-                color: white;
-                font-size: 1.5em;
-                flex-direction: column;
             `;
 
             document.body.appendChild(loading);
@@ -913,8 +839,7 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            showTab('create-campaign'); // Set initial tab
-            loadCampaigns(); // Load campaigns for manage tab in background
+            loadCampaigns();
         });
     </script>
 </body>
